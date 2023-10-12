@@ -2,7 +2,6 @@ package ru.alekseenko.entity;
 
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.TypeDef;
 import ru.alekseenko.entity.enums.UserState;
 
 import javax.persistence.*;
