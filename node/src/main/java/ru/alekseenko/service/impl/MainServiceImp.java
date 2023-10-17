@@ -1,5 +1,6 @@
 package ru.alekseenko.service.impl;
 
+import lombok.extern.log4j.Log4j;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Message;
@@ -13,7 +14,12 @@ import ru.alekseenko.entity.enums.UserState;
 import ru.alekseenko.service.MainService;
 import ru.alekseenko.service.ProducerService;
 
+import static ru.alekseenko.entity.enums.UserState.BASIC_STATE;
+import static ru.alekseenko.entity.enums.UserState.WAIT_FOR_EMAIL_STATE;
+import static ru.alekseenko.service.enums.ServiceCommands.*;
+
 @Service
+@Log4j
 public class MainServiceImp implements MainService {
 
     private final RawDataDAO rawDataDAO;
@@ -31,21 +37,104 @@ public class MainServiceImp implements MainService {
     public void processTextMessage(Update update) {
         saveRawData(update);
 
-        Message textMessage = update.getMessage();
-        User telegramUser = textMessage.getFrom();
-        AppUser appUser = findOrSaveAppUser(telegramUser);
+        AppUser appUser = findOrSaveAppUser(update);
+        UserState userState = appUser.getState();
+        String text = update.getMessage().getText();
+        String output = "";
 
+        if (CANCEL.equals(text)) {
+            output = cancelProcess(appUser);
+        } else if (BASIC_STATE.equals(userState)) {
+            output = processServiceCommand(appUser, text);
+        } else if (WAIT_FOR_EMAIL_STATE.equals(appUser.getState())) {
+            // TODO добавить обработку эл адресса
+        } else {
+            log.error("Unknown user state: " + userState);
+            output = "Неизвестная ошибка! Введите /cancel и попробуйте снова";
+        }
 
-        Message message = update.getMessage();
+        String chatId = update.getMessage().getChatId().toString();
+
+        sendAnswer(output, chatId);
+    }
+
+    @Override
+    public void processPhotoMessage(Update update) {
+        saveRawData(update);
+        AppUser appUser = findOrSaveAppUser(update);
+        String chatId = update.getMessage().getChatId().toString();
+        if (isNotAllowedToSendContent(chatId, appUser)) {
+            return;
+        }
+        //ToDo добавить сохранение документов.
+        String answer = "Фото успешно загружено!";
+        sendAnswer(answer, chatId);
+    }
+
+    private boolean isNotAllowedToSendContent(String chatId, AppUser appUser) {
+        UserState userState = appUser.getState();
+        if (!appUser.getIsActive()) {
+            String error = "Зарегистрируйтесь или активируйте свою учетную запись для загрузки контента.";
+            sendAnswer(error, chatId);
+            return true;
+        } else if (!BASIC_STATE.equals(userState)) {
+            String error = "Отмените текущую команду с помощью /cancel для отправки файлов";
+            sendAnswer(error, chatId);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public void processDocMessage(Update update) {
+        saveRawData(update);
+        AppUser appUser = findOrSaveAppUser(update);
+        String chatId = update.getMessage().getChatId().toString();
+        if (isNotAllowedToSendContent(chatId, appUser)) {
+            return;
+        }
+        //ToDo добавить сохранение документов.
+        String answer = "Документ успешно загружен!";
+        sendAnswer(answer, chatId);
+    }
+
+    private void sendAnswer(String output, String chatId) {
         SendMessage sendMessage = new SendMessage();
-        sendMessage.setChatId(message.getChatId());
-        sendMessage.setText("Hello from NODE");
+        sendMessage.setChatId(chatId);
+        sendMessage.setText(output);
 
         producerService.produceAnswer(sendMessage);
+    }
+
+    private String processServiceCommand(AppUser appUser, String cmd) {
+        if (REGISTRATION.equals(cmd)) {
+            //ToDo добавить регистрацию
+            return "Временно не доступно";
+        } else if(HELP.equals(cmd)) {
+            return help();
+        } else if (START.equals(cmd)) {
+            return "Привет! Чтобы посмотреть список доступных команд введи /help";
+        } else {
+            return "Неизвестная команда! Чтобы посмотреть список доступных команд введи /help";
+        }
 
     }
 
-    private AppUser findOrSaveAppUser(User telegramUser) {
+    private String help() {
+        return "Список доступных команд: \n"
+                + "/cancel - отмена выполнения текущей команды. \n"
+                + "/registration - регистрация пользователя.";
+    }
+
+    private String cancelProcess(AppUser appUser) {
+        appUser.setState(BASIC_STATE);
+        appUserDAO.save(appUser);
+        return "Команда отменена!";
+
+    }
+
+    private AppUser findOrSaveAppUser(Update update) {
+        User telegramUser = update.getMessage().getFrom();
         AppUser persistentAppUser = appUserDAO.findAppUserByTelegramUserId(telegramUser.getId());
         if (persistentAppUser == null) {
             AppUser transientAppUser = AppUser.builder()
@@ -54,7 +143,7 @@ public class MainServiceImp implements MainService {
                     .lastName(telegramUser.getLastName())
                     //TODO изменить значение по умолчанию после добавления регистрации
                     .isActive(true)
-                    .state(UserState.BASIC_STATE)
+                    .state(BASIC_STATE)
                     .build();
             return appUserDAO.save(transientAppUser);
         }
