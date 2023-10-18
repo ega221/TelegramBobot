@@ -8,8 +8,7 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import ru.alekseenko.service.UpdateProducer;
 import ru.alekseenko.utils.MessageUtils;
 
-import static ru.alekseenko.RabbitQueue.DOC_MESSAGE_UPDATE;
-import static ru.alekseenko.RabbitQueue.TEXT_MESSAGE_UPDATE;
+import static ru.alekseenko.RabbitQueue.*;
 
 @Component
 @Log4j
@@ -72,7 +71,7 @@ public class UpdateController {
     }
 
     private void processPhotoMessage(Update update) {
-        updateProducer.produce(DOC_MESSAGE_UPDATE, update);
+        updateProducer.produce(PHOTO_MESSAGE_UPDATE, update);
         setFileIsReceivedView(update);
     }
 

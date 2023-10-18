@@ -8,6 +8,7 @@ import org.telegram.telegrambots.meta.api.objects.User;
 import ru.alekseenko.dao.AppUserDAO;
 import ru.alekseenko.dao.RawDataDAO;
 import ru.alekseenko.entity.AppDocument;
+import ru.alekseenko.entity.AppPhoto;
 import ru.alekseenko.entity.AppUser;
 import ru.alekseenko.entity.RawData;
 import ru.alekseenko.entity.enums.UserState;
@@ -72,9 +73,17 @@ public class MainServiceImp implements MainService {
         if (isNotAllowedToSendContent(chatId, appUser)) {
             return;
         }
-        //ToDo добавить сохранение документов.
-        String answer = "Фото успешно загружено!";
-        sendAnswer(answer, chatId);
+
+        try {
+            AppPhoto photo = fileService.processPhoto(update.getMessage());
+            //ToDo добавить генерацию ссылок.
+            String answer = "Фото успешно загружено! Ваша ссылка...";
+            sendAnswer(answer, chatId);
+        } catch (UploadFileException ex) {
+            log.error(ex);
+            String error = "Загрузка фото не удалась, пожалуйста, попробуйте позже.";
+            sendAnswer(error, chatId);
+        }
     }
 
     private boolean isNotAllowedToSendContent(String chatId, AppUser appUser) {
