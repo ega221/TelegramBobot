@@ -3,20 +3,23 @@ package ru.alekseenko.service.impl;
 import lombok.extern.log4j.Log4j;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
-import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
 import ru.alekseenko.dao.AppUserDAO;
 import ru.alekseenko.dao.RawDataDAO;
+import ru.alekseenko.entity.AppDocument;
 import ru.alekseenko.entity.AppUser;
 import ru.alekseenko.entity.RawData;
 import ru.alekseenko.entity.enums.UserState;
+import ru.alekseenko.exceptions.UploadFileException;
+import ru.alekseenko.service.FileService;
 import ru.alekseenko.service.MainService;
 import ru.alekseenko.service.ProducerService;
+import ru.alekseenko.service.enums.ServiceCommand;
 
 import static ru.alekseenko.entity.enums.UserState.BASIC_STATE;
 import static ru.alekseenko.entity.enums.UserState.WAIT_FOR_EMAIL_STATE;
-import static ru.alekseenko.service.enums.ServiceCommands.*;
+import static ru.alekseenko.service.enums.ServiceCommand.*;
 
 @Service
 @Log4j
@@ -24,12 +27,13 @@ public class MainServiceImp implements MainService {
 
     private final RawDataDAO rawDataDAO;
     private final ProducerService producerService;
-
+    private final FileService fileService;
     private final AppUserDAO appUserDAO;
 
-    public MainServiceImp(RawDataDAO rawDataDAO, ProducerService producerService, AppUserDAO appUserDAO) {
+    public MainServiceImp(RawDataDAO rawDataDAO, ProducerService producerService, FileService fileService, AppUserDAO appUserDAO) {
         this.rawDataDAO = rawDataDAO;
         this.producerService = producerService;
+        this.fileService = fileService;
         this.appUserDAO = appUserDAO;
     }
 
@@ -42,7 +46,9 @@ public class MainServiceImp implements MainService {
         String text = update.getMessage().getText();
         String output = "";
 
-        if (CANCEL.equals(text)) {
+        ServiceCommand serviceCommand = ServiceCommand.fromValue(text);
+
+        if (CANCEL.equals(serviceCommand)) {
             output = cancelProcess(appUser);
         } else if (BASIC_STATE.equals(userState)) {
             output = processServiceCommand(appUser, text);
@@ -93,9 +99,18 @@ public class MainServiceImp implements MainService {
         if (isNotAllowedToSendContent(chatId, appUser)) {
             return;
         }
-        //ToDo добавить сохранение документов.
-        String answer = "Документ успешно загружен!";
-        sendAnswer(answer, chatId);
+
+        try {
+            AppDocument document = fileService.processDoc(update.getMessage());
+            //ToDo добавить генерацию ссылок.
+            String answer = "Документ успешно загружен! Ваша ссылка...";
+            sendAnswer(answer, chatId);
+        } catch (UploadFileException ex) {
+            log.error(ex);
+            String error = "Загрузка файла не удалась, пожалуйста, попробуйте позже.";
+            sendAnswer(error, chatId);
+        }
+
     }
 
     private void sendAnswer(String output, String chatId) {
