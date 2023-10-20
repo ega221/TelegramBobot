@@ -10,6 +10,7 @@ import ru.alekseenko.entity.AppDocument;
 import ru.alekseenko.entity.AppPhoto;
 import ru.alekseenko.entity.BinaryContent;
 import ru.alekseenko.service.FileService;
+import ru.alekseenko.utils.CryptoTool;
 
 import java.io.File;
 import java.io.IOException;
@@ -19,28 +20,28 @@ import java.io.IOException;
 public class FileServiceImpl implements FileService {
     private final AppDocumentDAO appDocumentDAO;
     private final AppPhotoDAO appPhotoDAO;
+    private final CryptoTool cryptoTool;
 
-    public FileServiceImpl(AppDocumentDAO appDocumentDAO, AppPhotoDAO appPhotoDAO) {
+    public FileServiceImpl(AppDocumentDAO appDocumentDAO, AppPhotoDAO appPhotoDAO, CryptoTool cryptoTool) {
         this.appDocumentDAO = appDocumentDAO;
         this.appPhotoDAO = appPhotoDAO;
+        this.cryptoTool = cryptoTool;
     }
 
 
     @Override
-    public AppDocument getDocument(String docId) {
-        // В кач-ве id должна приходить зашифрованная строка, чтобы пользователь не мог
-        // просто написать какой ему захочется id и скачать любой файл.
-        //ToDo нужно сделать передачу id в закрытом виде, с его последующей расшифровкой.
-        Long id = Long.parseLong(docId);
+    public AppDocument getDocument(String hash) {
+        Long id = cryptoTool.idOf(hash);
+        if (id == null) {
+            return null;
+        }
         return appDocumentDAO.findById(id).orElse(null);
     }
 
     @Override
-    public AppPhoto getPhoto(String photoId) {
-        // В кач-ве id должна приходить зашифрованная строка, чтобы пользователь не мог
-        // просто написать какой ему захочется id и скачать любой файл.
-        //ToDo нужно сделать передачу id в закрытом виде, с его последующей расшифровкой.
-        Long id = Long.parseLong(photoId);
+    public AppPhoto getPhoto(String hash) {
+
+        Long id = cryptoTool.idOf(hash);
         return appPhotoDAO.findById(id).orElse(null);
     }
 

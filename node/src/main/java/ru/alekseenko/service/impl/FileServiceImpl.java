@@ -16,6 +16,8 @@ import ru.alekseenko.entity.AppPhoto;
 import ru.alekseenko.entity.BinaryContent;
 import ru.alekseenko.service.FileService;
 import ru.alekseenko.exceptions.UploadFileException;
+import ru.alekseenko.service.enums.LinkType;
+import ru.alekseenko.utils.CryptoTool;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,16 +31,22 @@ public class FileServiceImpl implements FileService {
     private String fileInfoUri;
     @Value("${service.file_storage.uri}")
     private String fileStorageUri;
+    @Value("${link.address}")
+    private String linkAddress;
 
     private final AppDocumentDAO appDocumentDAO;
     private final AppPhotoDAO appPhotoDAO;
     private final BinaryContentDAO binaryContentDAO;
+    private final CryptoTool cryptoTool;
 
-    public FileServiceImpl(AppDocumentDAO appDocumentDAO, AppPhotoDAO appPhotoDAO, BinaryContentDAO binaryContentDAO) {
+
+    public FileServiceImpl(AppDocumentDAO appDocumentDAO, AppPhotoDAO appPhotoDAO, BinaryContentDAO binaryContentDAO, CryptoTool cryptoTool) {
         this.appDocumentDAO = appDocumentDAO;
         this.appPhotoDAO = appPhotoDAO;
         this.binaryContentDAO = binaryContentDAO;
+        this.cryptoTool = cryptoTool;
     }
+
 
     @Override
     public AppDocument processDoc(Message telegramMessage) {
@@ -54,6 +62,7 @@ public class FileServiceImpl implements FileService {
             throw new UploadFileException("Bad response from telegram service: " + response);
         }
     }
+
 
     @Override
     public AppPhoto processPhoto(Message telegramMessage) {
@@ -74,7 +83,6 @@ public class FileServiceImpl implements FileService {
     }
 
 
-
     private BinaryContent getPersistentBinaryContent(ResponseEntity<String> response) {
         String filePath = getFilePath(response);
 
@@ -85,6 +93,7 @@ public class FileServiceImpl implements FileService {
 
         return binaryContentDAO.save(transientBinaryContent);
     }
+
 
     private static String getFilePath(ResponseEntity<String> response) {
         JSONObject jsonObject = new JSONObject(response.getBody());
@@ -104,6 +113,7 @@ public class FileServiceImpl implements FileService {
                 .build();
     }
 
+
     private AppPhoto buildTransientAppPhoto(PhotoSize telegramPhoto, BinaryContent persistentBinaryContent) {
         return AppPhoto.builder()
                 .telegramFileId(telegramPhoto.getFileId())
@@ -111,6 +121,7 @@ public class FileServiceImpl implements FileService {
                 .fileSize(telegramPhoto.getFileSize())
                 .build();
     }
+
 
     private byte[] downloadFile(String filePath) {
         String fullUri = fileStorageUri.replace("{token}", token)
@@ -130,6 +141,7 @@ public class FileServiceImpl implements FileService {
         }
     }
 
+
     private ResponseEntity<String> getFilePath(String fileId) {
         RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
@@ -142,5 +154,11 @@ public class FileServiceImpl implements FileService {
                 String.class,
                 token, fileId
         );
+    }
+
+    @Override
+    public String generateLink(Long docId, LinkType linkType) {
+        String hash = cryptoTool.hashOf(docId);
+        return "http://" + linkAddress + "/" + linkType + "?id=" + hash;
     }
 }

@@ -16,6 +16,7 @@ import ru.alekseenko.exceptions.UploadFileException;
 import ru.alekseenko.service.FileService;
 import ru.alekseenko.service.MainService;
 import ru.alekseenko.service.ProducerService;
+import ru.alekseenko.service.enums.LinkType;
 import ru.alekseenko.service.enums.ServiceCommand;
 
 import static ru.alekseenko.entity.enums.UserState.BASIC_STATE;
@@ -76,8 +77,8 @@ public class MainServiceImp implements MainService {
 
         try {
             AppPhoto photo = fileService.processPhoto(update.getMessage());
-            //ToDo добавить генерацию ссылок.
-            String answer = "Фото успешно загружено! Ваша ссылка...";
+            String link = fileService.generateLink(photo.getId(), LinkType.GET_PHOTO);
+            String answer = "Фото успешно загружено! Ваша ссылка: " + link;
             sendAnswer(answer, chatId);
         } catch (UploadFileException ex) {
             log.error(ex);
@@ -111,8 +112,8 @@ public class MainServiceImp implements MainService {
 
         try {
             AppDocument document = fileService.processDoc(update.getMessage());
-            //ToDo добавить генерацию ссылок.
-            String answer = "Документ успешно загружен! Ваша ссылка...";
+            String link = fileService.generateLink(document.getId(), LinkType.GET_DOC);
+            String answer = "Документ успешно загружен! Ваша ссылка: " + link;
             sendAnswer(answer, chatId);
         } catch (UploadFileException ex) {
             log.error(ex);
